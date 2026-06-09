@@ -63,19 +63,19 @@ flowchart TB
 
 ## 快速开始
 
-> M1 已完成，以下命令即可运行。
-
 ```bash
 cd ~/cursor-agent-web
 
-# 配置 API Key
-export CURSOR_API_KEY="cursor_..."
-# 或复制 .env.example 为 .env 并填入
+# 配置 API Key（必须）
+cp .env.example .env
+# 编辑 .env，填入 CURSOR_API_KEY
 
 npm install
 npm run dev
 
 # 打开 http://localhost:3000
+# 1. 侧边栏点击「添加本地目录」，填入项目绝对路径
+# 2. 在输入框发送 prompt，即可流式对话
 ```
 
 ---
@@ -114,8 +114,8 @@ cursor-agent-web/
 | 阶段 | 交付物 | 状态 |
 |------|--------|------|
 | M0 立项 | PRD + README + git init | 完成 |
-| M1 骨架 | Next.js 脚手架、深色 UI 壳 | **当前** |
-| M2 Agent | SDK 集成、流式对话、项目管理 API | 待开始 |
+| M1 骨架 | Next.js 脚手架、深色 UI 壳 | 完成 |
+| M2 Agent | SDK 集成、流式对话、项目管理 API | **当前** |
 | M3 Git | Git 面板 + 完整命令封装 | 待开始 |
 | M4 打磨 | @/ 菜单、错误处理、会话恢复 | 待开始 |
 

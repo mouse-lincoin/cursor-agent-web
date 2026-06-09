@@ -1,30 +1,102 @@
 "use client";
 
-import { useState } from "react";
-import { MOCK_MODELS, MOCK_PROJECT_GROUPS, MOCK_USER } from "@/lib/mock-data";
+import { useEffect, useState } from "react";
+import { MOCK_USER } from "@/lib/mock-data";
+import { useAppStore } from "@/lib/store/app-store";
+import { AddProjectDialog } from "./AddProjectDialog";
+import { ChatView } from "./ChatView";
 import { HomeView } from "./HomeView";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
 export function AppShell() {
-  const [activeSessionId] = useState<string | undefined>("s1");
+  const [addProjectOpen, setAddProjectOpen] = useState(false);
+
+  const {
+    init,
+    projects,
+    models,
+    messages,
+    activeProjectId,
+    activeSessionId,
+    selectedModel,
+    isLoading,
+    isStreaming,
+    error,
+    view,
+    setActiveProject,
+    setActiveSession,
+    setSelectedModel,
+    addProject,
+    newAgent,
+    sendMessage,
+    goHome,
+    getProjectGroups,
+  } = useAppStore();
+
+  useEffect(() => {
+    init();
+  }, [init]);
+
+  const activeProject = projects.find((p) => p.id === activeProjectId);
+  const topBarTitle = view === "chat" && activeProject ? activeProject.name : "Home";
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg-base">
       <Sidebar
-        groups={MOCK_PROJECT_GROUPS}
+        groups={getProjectGroups()}
         user={MOCK_USER}
+        activeProjectId={activeProjectId}
         activeSessionId={activeSessionId}
-        onNewAgent={() => {}}
+        onNewAgent={newAgent}
+        onSelectSession={(id) => setActiveSession(id)}
+        onSelectProject={(id) => setActiveProject(id)}
+        onAddProject={() => setAddProjectOpen(true)}
       />
+
       <main className="flex min-w-0 flex-1 flex-col">
-        <TopBar projectName="Home" />
-        <HomeView
-          models={MOCK_MODELS}
-          onSubmit={(prompt) => console.log("submit:", prompt)}
-          onPlanNewIdea={() => console.log("plan new idea")}
-        />
+        <TopBar projectName={topBarTitle} onHomeClick={goHome} />
+
+        {error && (
+          <div className="border-b border-red-900/50 bg-red-950/30 px-4 py-2 text-[12px] text-red-300">
+            {error}
+          </div>
+        )}
+
+        {isLoading && !isStreaming ? (
+          <div className="flex flex-1 items-center justify-center text-[13px] text-text-muted">
+            加载中...
+          </div>
+        ) : view === "chat" ? (
+          <ChatView
+            messages={messages}
+            models={models}
+            selectedModel={selectedModel}
+            isStreaming={isStreaming}
+            onModelChange={setSelectedModel}
+            onSubmit={sendMessage}
+          />
+        ) : (
+          <HomeView
+            models={models}
+            selectedModel={selectedModel}
+            isStreaming={isStreaming}
+            hasProjects={projects.length > 0}
+            onModelChange={setSelectedModel}
+            onSubmit={sendMessage}
+            onPlanNewIdea={() =>
+              sendMessage("Help me plan a new idea. Ask clarifying questions first.")
+            }
+            onAddProject={() => setAddProjectOpen(true)}
+          />
+        )}
       </main>
+
+      <AddProjectDialog
+        open={addProjectOpen}
+        onClose={() => setAddProjectOpen(false)}
+        onAdd={addProject}
+      />
     </div>
   );
 }

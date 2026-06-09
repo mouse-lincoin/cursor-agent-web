@@ -4,13 +4,17 @@ import { ChevronDown, ExternalLink, LayoutGrid, MoreHorizontal, User } from "luc
 
 interface TopBarProps {
   projectName?: string;
+  onHomeClick?: () => void;
 }
 
-export function TopBar({ projectName = "Home" }: TopBarProps) {
+export function TopBar({ projectName = "Home", onHomeClick }: TopBarProps) {
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle px-4">
       <div className="flex items-center gap-3">
-        <button className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-text-primary transition-colors hover:bg-bg-elevated">
+        <button
+          onClick={onHomeClick}
+          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-text-primary transition-colors hover:bg-bg-elevated"
+        >
           {projectName}
           <ChevronDown size={14} className="text-text-muted" />
         </button>

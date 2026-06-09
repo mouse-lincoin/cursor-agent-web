@@ -4,8 +4,8 @@ import {
   Bot,
   ChevronDown,
   ChevronRight,
-  Cloud,
   Filter,
+  FolderPlus,
   GitBranch,
   PanelLeft,
   Plus,
@@ -20,21 +20,26 @@ import type { ProjectGroup, UserProfile } from "@/types";
 interface SidebarProps {
   groups: ProjectGroup[];
   user: UserProfile;
-  activeSessionId?: string;
+  activeProjectId?: string | null;
+  activeSessionId?: string | null;
   onNewAgent?: () => void;
+  onSelectSession?: (sessionId: string) => void;
+  onSelectProject?: (projectId: string) => void;
+  onAddProject?: () => void;
 }
 
 function SessionItem({
   title,
-  isCloud,
   isActive,
+  onClick,
 }: {
   title: string;
-  isCloud?: boolean;
   isActive?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
+      onClick={onClick}
       className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors ${
         isActive
           ? "bg-bg-elevated text-text-primary"
@@ -43,51 +48,61 @@ function SessionItem({
     >
       <GitBranch size={13} className="shrink-0 opacity-60" />
       <span className="min-w-0 flex-1 truncate">{title}</span>
-      {isCloud && <Cloud size={12} className="shrink-0 opacity-40" />}
     </button>
   );
 }
 
 function ProjectItem({
+  id,
   name,
   sessions,
+  isActiveProject,
   activeSessionId,
+  onSelectProject,
+  onSelectSession,
 }: {
+  id: string;
   name: string;
-  sessions: { id: string; title: string; isCloud?: boolean }[];
-  activeSessionId?: string;
+  sessions: { id: string; title: string }[];
+  isActiveProject?: boolean;
+  activeSessionId?: string | null;
+  onSelectProject?: (id: string) => void;
+  onSelectSession?: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(sessions.length > 0);
-
-  if (sessions.length === 0) {
-    return (
-      <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-text-secondary transition-colors hover:bg-bg-elevated/60 hover:text-text-primary">
-        <span className="min-w-0 flex-1 truncate">{name}</span>
-      </button>
-    );
-  }
+  const [expanded, setExpanded] = useState(sessions.length > 0 || isActiveProject);
 
   return (
     <div>
       <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[13px] text-text-secondary transition-colors hover:bg-bg-elevated/60 hover:text-text-primary"
+        onClick={() => {
+          if (sessions.length > 0) setExpanded(!expanded);
+          onSelectProject?.(id);
+        }}
+        className={`flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors ${
+          isActiveProject
+            ? "bg-bg-elevated/40 text-text-primary"
+            : "text-text-secondary hover:bg-bg-elevated/60 hover:text-text-primary"
+        }`}
       >
-        {expanded ? (
-          <ChevronDown size={13} className="shrink-0 opacity-50" />
+        {sessions.length > 0 ? (
+          expanded ? (
+            <ChevronDown size={13} className="shrink-0 opacity-50" />
+          ) : (
+            <ChevronRight size={13} className="shrink-0 opacity-50" />
+          )
         ) : (
-          <ChevronRight size={13} className="shrink-0 opacity-50" />
+          <span className="w-[13px]" />
         )}
         <span className="min-w-0 flex-1 truncate">{name}</span>
       </button>
-      {expanded && (
+      {expanded && sessions.length > 0 && (
         <div className="ml-3 mt-0.5 space-y-0.5 border-l border-border-subtle pl-2">
           {sessions.map((s) => (
             <SessionItem
               key={s.id}
               title={s.title}
-              isCloud={s.isCloud}
               isActive={s.id === activeSessionId}
+              onClick={() => onSelectSession?.(s.id)}
             />
           ))}
         </div>
@@ -96,10 +111,18 @@ function ProjectItem({
   );
 }
 
-export function Sidebar({ groups, user, activeSessionId, onNewAgent }: SidebarProps) {
+export function Sidebar({
+  groups,
+  user,
+  activeProjectId,
+  activeSessionId,
+  onNewAgent,
+  onSelectSession,
+  onSelectProject,
+  onAddProject,
+}: SidebarProps) {
   return (
     <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-border-subtle bg-bg-sidebar">
-      {/* Toolbar */}
       <div className="flex items-center gap-1 px-3 py-3">
         <button className="rounded-md p-1.5 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary">
           <PanelLeft size={16} />
@@ -109,7 +132,6 @@ export function Sidebar({ groups, user, activeSessionId, onNewAgent }: SidebarPr
         </button>
       </div>
 
-      {/* New Agent */}
       <div className="px-3 pb-2">
         <button
           onClick={onNewAgent}
@@ -125,7 +147,6 @@ export function Sidebar({ groups, user, activeSessionId, onNewAgent }: SidebarPr
         </button>
       </div>
 
-      {/* Nav links */}
       <nav className="space-y-0.5 px-3 pb-3">
         <button className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-text-secondary transition-colors hover:bg-bg-elevated/60 hover:text-text-primary">
           <Bot size={15} className="opacity-70" />
@@ -137,30 +158,51 @@ export function Sidebar({ groups, user, activeSessionId, onNewAgent }: SidebarPr
         </button>
       </nav>
 
-      {/* Project tree */}
       <div className="flex-1 overflow-y-auto px-3">
         {groups.map((group) => (
           <div key={group.id} className="mb-3">
-            {group.label && (
-              <div className="mb-1 px-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
-                {group.label}
-              </div>
-            )}
+            <div className="mb-1 flex items-center justify-between px-2">
+              {group.label && (
+                <span className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+                  {group.label}
+                </span>
+              )}
+              <button
+                onClick={onAddProject}
+                title="添加项目"
+                className="rounded p-0.5 text-text-muted hover:bg-bg-elevated hover:text-text-secondary"
+              >
+                <FolderPlus size={13} />
+              </button>
+            </div>
             <div className="space-y-0.5">
-              {group.projects.map((project) => (
-                <ProjectItem
-                  key={project.id}
-                  name={project.name}
-                  sessions={project.sessions}
-                  activeSessionId={activeSessionId}
-                />
-              ))}
+              {group.projects.length === 0 ? (
+                <button
+                  onClick={onAddProject}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-text-muted hover:bg-bg-elevated/60 hover:text-text-secondary"
+                >
+                  <FolderPlus size={13} />
+                  添加本地目录...
+                </button>
+              ) : (
+                group.projects.map((project) => (
+                  <ProjectItem
+                    key={project.id}
+                    id={project.id}
+                    name={project.name}
+                    sessions={project.sessions}
+                    isActiveProject={project.id === activeProjectId}
+                    activeSessionId={activeSessionId}
+                    onSelectProject={onSelectProject}
+                    onSelectSession={onSelectSession}
+                  />
+                ))
+              )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* User footer */}
       <div className="border-t border-border-subtle px-3 py-3">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-bg-elevated">
