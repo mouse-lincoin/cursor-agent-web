@@ -1,0 +1,37 @@
+"use client";
+
+import { ChevronDown, ExternalLink, LayoutGrid, MoreHorizontal, User } from "lucide-react";
+
+interface TopBarProps {
+  projectName?: string;
+}
+
+export function TopBar({ projectName = "Home" }: TopBarProps) {
+  return (
+    <header className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle px-4">
+      <div className="flex items-center gap-3">
+        <button className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-text-primary transition-colors hover:bg-bg-elevated">
+          {projectName}
+          <ChevronDown size={14} className="text-text-muted" />
+        </button>
+        <div className="flex items-center gap-1.5 rounded-full border border-border bg-bg-surface px-2.5 py-0.5 text-[11px] text-text-secondary">
+          <User size={11} className="text-success" />
+          <span>Local</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <button className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary">
+          Editor Window
+          <ExternalLink size={12} className="opacity-60" />
+        </button>
+        <button className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-secondary">
+          <MoreHorizontal size={16} />
+        </button>
+        <button className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-secondary">
+          <LayoutGrid size={16} />
+        </button>
+      </div>
+    </header>
+  );
+}
