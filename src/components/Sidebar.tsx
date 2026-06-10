@@ -26,6 +26,7 @@ interface SidebarProps {
   onSelectSession?: (sessionId: string) => void;
   onSelectProject?: (projectId: string) => void;
   onAddProject?: () => void;
+  onOpenGit?: (projectId: string) => void;
 }
 
 function SessionItem({
@@ -120,6 +121,7 @@ export function Sidebar({
   onSelectSession,
   onSelectProject,
   onAddProject,
+  onOpenGit,
 }: SidebarProps) {
   return (
     <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-border-subtle bg-bg-sidebar">
@@ -186,16 +188,24 @@ export function Sidebar({
                 </button>
               ) : (
                 group.projects.map((project) => (
-                  <ProjectItem
-                    key={project.id}
-                    id={project.id}
-                    name={project.name}
-                    sessions={project.sessions}
-                    isActiveProject={project.id === activeProjectId}
-                    activeSessionId={activeSessionId}
-                    onSelectProject={onSelectProject}
-                    onSelectSession={onSelectSession}
-                  />
+                  <div key={project.id} className="group/item relative">
+                    <ProjectItem
+                      id={project.id}
+                      name={project.name}
+                      sessions={project.sessions}
+                      isActiveProject={project.id === activeProjectId}
+                      activeSessionId={activeSessionId}
+                      onSelectProject={onSelectProject}
+                      onSelectSession={onSelectSession}
+                    />
+                    <button
+                      onClick={() => onOpenGit?.(project.id)}
+                      title="Git"
+                      className="absolute right-1 top-1.5 hidden rounded p-0.5 text-text-muted hover:bg-bg-elevated hover:text-text-secondary group-hover/item:block"
+                    >
+                      <GitBranch size={11} />
+                    </button>
+                  </div>
                 ))
               )}
             </div>

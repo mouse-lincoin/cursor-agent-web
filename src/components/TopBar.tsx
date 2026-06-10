@@ -1,13 +1,15 @@
 "use client";
 
-import { ChevronDown, ExternalLink, LayoutGrid, MoreHorizontal, User } from "lucide-react";
+import { ChevronDown, ExternalLink, GitBranch, LayoutGrid, MoreHorizontal, User } from "lucide-react";
 
 interface TopBarProps {
   projectName?: string;
   onHomeClick?: () => void;
+  onGitClick?: () => void;
+  showGit?: boolean;
 }
 
-export function TopBar({ projectName = "Home", onHomeClick }: TopBarProps) {
+export function TopBar({ projectName = "Home", onHomeClick, onGitClick, showGit }: TopBarProps) {
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle px-4">
       <div className="flex items-center gap-3">
@@ -25,6 +27,15 @@ export function TopBar({ projectName = "Home", onHomeClick }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-1">
+        {showGit && (
+          <button
+            onClick={onGitClick}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
+          >
+            <GitBranch size={13} />
+            Git
+          </button>
+        )}
         <button className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary">
           Editor Window
           <ExternalLink size={12} className="opacity-60" />

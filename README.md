@@ -76,6 +76,7 @@ npm run dev
 # 打开 http://localhost:3000
 # 1. 侧边栏点击「添加本地目录」，填入项目绝对路径
 # 2. 在输入框发送 prompt，即可流式对话
+# 3. 顶栏或侧边栏点击 Git，管理变更/提交/分支
 ```
 
 ---
@@ -115,8 +116,8 @@ cursor-agent-web/
 |------|--------|------|
 | M0 立项 | PRD + README + git init | 完成 |
 | M1 骨架 | Next.js 脚手架、深色 UI 壳 | 完成 |
-| M2 Agent | SDK 集成、流式对话、项目管理 API | **当前** |
-| M3 Git | Git 面板 + 完整命令封装 | 待开始 |
+| M2 Agent | SDK 集成、流式对话、项目管理 API | 完成 |
+| M3 Git | Git 面板 + 完整命令封装 | **当前** |
 | M4 打磨 | @/ 菜单、错误处理、会话恢复 | 待开始 |
 
 详细功能分级与 API 设计见 [docs/PRD.md](docs/PRD.md)。

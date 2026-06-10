@@ -15,7 +15,7 @@ interface AppState {
   isLoading: boolean;
   isStreaming: boolean;
   error: string | null;
-  view: "home" | "chat";
+  view: "home" | "chat" | "git";
 
   init: () => Promise<void>;
   setActiveProject: (id: string | null) => void;
@@ -27,6 +27,7 @@ interface AppState {
   newAgent: () => Promise<void>;
   sendMessage: (prompt: string) => Promise<void>;
   goHome: () => void;
+  openGit: (projectId?: string) => void;
   getProjectGroups: () => ProjectGroup[];
 }
 
@@ -216,6 +217,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   goHome: () => set({ view: "home", activeSessionId: null, messages: [] }),
+
+  openGit: (projectId) => {
+    const id = projectId ?? get().activeProjectId ?? get().projects[0]?.id;
+    if (!id) {
+      set({ error: "请先添加一个项目目录" });
+      return;
+    }
+    set({ activeProjectId: id, view: "git", activeSessionId: null, messages: [] });
+  },
 
   getProjectGroups: () => {
     const { projects, sessions } = get();
