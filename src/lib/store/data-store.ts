@@ -1,20 +1,26 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import type { AgentSession, DataStore, Project, RunRecord } from "@/types";
+import type { AgentSession, ChatMessage, DataStore, Project, RunRecord, SessionTranscript } from "@/types";
 
 const DATA_DIR = process.env.DATA_DIR ?? path.join(os.homedir(), ".cursor-agent-web");
 const DATA_FILE = path.join(DATA_DIR, "data.json");
 
 function emptyStore(): DataStore {
-  return { projects: [], sessions: [], runs: [] };
+  return { projects: [], sessions: [], runs: [], transcripts: [] };
 }
 
 function readStore(): DataStore {
   try {
     if (!fs.existsSync(DATA_FILE)) return emptyStore();
     const raw = fs.readFileSync(DATA_FILE, "utf-8");
-    return JSON.parse(raw) as DataStore;
+    const parsed = JSON.parse(raw) as Partial<DataStore>;
+    return {
+      projects: parsed.projects ?? [],
+      sessions: parsed.sessions ?? [],
+      runs: parsed.runs ?? [],
+      transcripts: parsed.transcripts ?? [],
+    };
   } catch {
     return emptyStore();
   }
@@ -57,8 +63,11 @@ export function updateProject(id: string, patch: Partial<Project>): Project | un
 export function removeProject(id: string): boolean {
   const store = readStore();
   const before = store.projects.length;
+  const removedSessionIds = store.sessions.filter((s) => s.projectId === id).map((s) => s.id);
   store.projects = store.projects.filter((p) => p.id !== id);
   store.sessions = store.sessions.filter((s) => s.projectId !== id);
+  store.transcripts = store.transcripts.filter((t) => !removedSessionIds.includes(t.sessionId));
+  store.runs = store.runs.filter((r) => !removedSessionIds.includes(r.agentSessionId));
   writeStore(store);
   return store.projects.length < before;
 }
@@ -78,6 +87,7 @@ export function getSession(id: string): AgentSession | undefined {
 export function addSession(session: AgentSession): AgentSession {
   const store = readStore();
   store.sessions.push(session);
+  store.transcripts.push({ sessionId: session.id, messages: [], updatedAt: session.createdAt });
   writeStore(store);
   return session;
 }
@@ -105,4 +115,26 @@ export function updateRun(id: string, patch: Partial<RunRecord>): RunRecord | un
   store.runs[idx] = { ...store.runs[idx], ...patch };
   writeStore(store);
   return store.runs[idx];
+}
+
+export function getTranscript(sessionId: string): ChatMessage[] {
+  const store = readStore();
+  return store.transcripts.find((t) => t.sessionId === sessionId)?.messages ?? [];
+}
+
+export function saveTranscript(sessionId: string, messages: ChatMessage[]): void {
+  const store = readStore();
+  const now = new Date().toISOString();
+  const idx = store.transcripts.findIndex((t) => t.sessionId === sessionId);
+  const entry: SessionTranscript = { sessionId, messages, updatedAt: now };
+  if (idx === -1) store.transcripts.push(entry);
+  else store.transcripts[idx] = entry;
+  writeStore(store);
+}
+
+export function appendToTranscript(sessionId: string, newMessages: ChatMessage[]): ChatMessage[] {
+  const existing = getTranscript(sessionId);
+  const merged = [...existing, ...newMessages];
+  saveTranscript(sessionId, merged);
+  return merged;
 }

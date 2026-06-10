@@ -5,6 +5,7 @@ import { MOCK_USER } from "@/lib/mock-data";
 import { useAppStore } from "@/lib/store/app-store";
 import { AddProjectDialog } from "./AddProjectDialog";
 import { ChatView } from "./ChatView";
+import { ErrorBanner } from "./ErrorBanner";
 import { GitPanel } from "./GitPanel";
 import { HomeView } from "./HomeView";
 import { Sidebar } from "./Sidebar";
@@ -12,6 +13,7 @@ import { TopBar } from "./TopBar";
 
 export function AppShell() {
   const [addProjectOpen, setAddProjectOpen] = useState(false);
+  const [lastPrompt, setLastPrompt] = useState("");
 
   const {
     init,
@@ -24,6 +26,8 @@ export function AppShell() {
     isLoading,
     isStreaming,
     error,
+    errorMeta,
+    planTemplate,
     view,
     setActiveProject,
     setActiveSession,
@@ -31,8 +35,12 @@ export function AppShell() {
     addProject,
     newAgent,
     sendMessage,
+    cancelStream,
+    clearError,
     goHome,
     openGit,
+    openPlanNewIdea,
+    consumePlanTemplate,
     getProjectGroups,
   } = useAppStore();
 
@@ -43,6 +51,11 @@ export function AppShell() {
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const topBarTitle =
     (view === "chat" || view === "git") && activeProject ? activeProject.name : "Home";
+
+  async function handleSend(prompt: string) {
+    setLastPrompt(prompt);
+    await sendMessage(prompt);
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg-base">
@@ -61,15 +74,29 @@ export function AppShell() {
       <main className="flex min-w-0 flex-1 flex-col">
         <TopBar
           projectName={topBarTitle}
+          projectPath={activeProject?.path}
           onHomeClick={goHome}
           onGitClick={() => openGit()}
           showGit={projects.length > 0}
         />
 
         {error && (
-          <div className="border-b border-red-900/50 bg-red-950/30 px-4 py-2 text-[12px] text-red-300">
-            {error}
-          </div>
+          <ErrorBanner
+            message={error}
+            runId={errorMeta?.runId}
+            agentId={errorMeta?.agentId}
+            errorType={errorMeta?.errorType}
+            retryable={errorMeta?.retryable}
+            onDismiss={clearError}
+            onRetry={
+              errorMeta?.retryable && lastPrompt
+                ? () => {
+                    clearError();
+                    handleSend(lastPrompt);
+                  }
+                : undefined
+            }
+          />
         )}
 
         {isLoading && !isStreaming ? (
@@ -84,8 +111,10 @@ export function AppShell() {
             models={models}
             selectedModel={selectedModel}
             isStreaming={isStreaming}
+            projectId={activeProjectId}
             onModelChange={setSelectedModel}
-            onSubmit={sendMessage}
+            onSubmit={handleSend}
+            onCancel={cancelStream}
           />
         ) : (
           <HomeView
@@ -93,12 +122,13 @@ export function AppShell() {
             selectedModel={selectedModel}
             isStreaming={isStreaming}
             hasProjects={projects.length > 0}
+            projectId={activeProjectId ?? projects[0]?.id}
+            planTemplate={planTemplate}
             onModelChange={setSelectedModel}
-            onSubmit={sendMessage}
-            onPlanNewIdea={() =>
-              sendMessage("Help me plan a new idea. Ask clarifying questions first.")
-            }
+            onSubmit={handleSend}
+            onPlanNewIdea={openPlanNewIdea}
             onAddProject={() => setAddProjectOpen(true)}
+            onPlanTemplateConsumed={consumePlanTemplate}
           />
         )}
       </main>

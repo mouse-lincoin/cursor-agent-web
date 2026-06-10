@@ -26,6 +26,12 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             生成中...
           </span>
         )}
+        {message.errorType && !message.isStreaming && (
+          <span className="mt-1 block text-[11px] text-red-400">
+            {message.errorType === "startup" ? "启动失败" : "运行失败"}
+            {message.runId && ` · run: ${message.runId.slice(0, 8)}`}
+          </span>
+        )}
       </div>
     </div>
   );

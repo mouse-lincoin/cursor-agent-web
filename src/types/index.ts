@@ -25,10 +25,17 @@ export interface RunRecord {
   finishedAt?: string;
 }
 
+export interface SessionTranscript {
+  sessionId: string;
+  messages: ChatMessage[];
+  updatedAt: string;
+}
+
 export interface DataStore {
   projects: Project[];
   sessions: AgentSession[];
   runs: RunRecord[];
+  transcripts: SessionTranscript[];
 }
 
 export interface ChatMessage {
@@ -37,6 +44,8 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   isStreaming?: boolean;
+  runId?: string;
+  errorType?: "startup" | "run";
 }
 
 export interface ModelInfo {
@@ -44,12 +53,24 @@ export interface ModelInfo {
   label: string;
 }
 
+export interface SkillInfo {
+  id: string;
+  name: string;
+  description: string;
+  source: "user" | "project";
+}
+
+export interface FileEntry {
+  path: string;
+  name: string;
+  isDirectory: boolean;
+}
+
 export interface UserProfile {
   name: string;
   plan: string;
 }
 
-// Legacy shape for sidebar grouping
 export interface ProjectGroup {
   id: string;
   label: string;
@@ -60,3 +81,10 @@ export interface ProjectGroup {
     sessions: { id: string; title: string }[];
   }[];
 }
+
+export const PLAN_NEW_IDEA_TEMPLATE = `I have a new idea I'd like to plan. Please help me:
+1. Ask clarifying questions about the goal and constraints
+2. Identify risks and dependencies
+3. Propose a phased implementation plan
+
+My idea: `;

@@ -4,12 +4,23 @@ import { ChevronDown, ExternalLink, GitBranch, LayoutGrid, MoreHorizontal, User 
 
 interface TopBarProps {
   projectName?: string;
+  projectPath?: string;
   onHomeClick?: () => void;
   onGitClick?: () => void;
   showGit?: boolean;
 }
 
-export function TopBar({ projectName = "Home", onHomeClick, onGitClick, showGit }: TopBarProps) {
+export function TopBar({
+  projectName = "Home",
+  projectPath,
+  onHomeClick,
+  onGitClick,
+  showGit,
+}: TopBarProps) {
+  const editorUrl = projectPath
+    ? `cursor://file/${encodeURIComponent(projectPath)}`
+    : undefined;
+
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle px-4">
       <div className="flex items-center gap-3">
@@ -36,10 +47,23 @@ export function TopBar({ projectName = "Home", onHomeClick, onGitClick, showGit 
             Git
           </button>
         )}
-        <button className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary">
-          Editor Window
-          <ExternalLink size={12} className="opacity-60" />
-        </button>
+        {editorUrl ? (
+          <a
+            href={editorUrl}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
+          >
+            Editor Window
+            <ExternalLink size={12} className="opacity-60" />
+          </a>
+        ) : (
+          <button
+            disabled
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-muted opacity-50"
+          >
+            Editor Window
+            <ExternalLink size={12} className="opacity-60" />
+          </button>
+        )}
         <button className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-secondary">
           <MoreHorizontal size={16} />
         </button>

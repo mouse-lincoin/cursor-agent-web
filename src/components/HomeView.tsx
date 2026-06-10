@@ -8,10 +8,13 @@ interface HomeViewProps {
   selectedModel: string;
   isStreaming: boolean;
   hasProjects: boolean;
+  projectId?: string | null;
+  planTemplate?: string | null;
   onModelChange: (model: string) => void;
   onSubmit?: (prompt: string) => void;
   onPlanNewIdea?: () => void;
   onAddProject?: () => void;
+  onPlanTemplateConsumed?: () => void;
 }
 
 export function HomeView({
@@ -19,10 +22,13 @@ export function HomeView({
   selectedModel,
   isStreaming,
   hasProjects,
+  projectId,
+  planTemplate,
   onModelChange,
   onSubmit,
   onPlanNewIdea,
   onAddProject,
+  onPlanTemplateConsumed,
 }: HomeViewProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6">
@@ -43,6 +49,9 @@ export function HomeView({
           onModelChange={onModelChange}
           onSubmit={onSubmit}
           disabled={isStreaming || !hasProjects}
+          projectId={projectId}
+          initialValue={planTemplate ?? undefined}
+          onInitialValueConsumed={onPlanTemplateConsumed}
         />
 
         <button

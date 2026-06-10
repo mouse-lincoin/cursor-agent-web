@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import * as api from "@/lib/api/client";
 import type { AgentSession, ChatMessage, ModelInfo, Project, ProjectGroup } from "@/types";
+import { PLAN_NEW_IDEA_TEMPLATE } from "@/types";
 
 interface AppState {
   projects: Project[];
@@ -14,20 +15,27 @@ interface AppState {
   selectedModel: string;
   isLoading: boolean;
   isStreaming: boolean;
+  activeRunId: string | null;
   error: string | null;
+  errorMeta: { runId?: string; agentId?: string; retryable?: boolean; errorType?: string } | null;
+  planTemplate: string | null;
   view: "home" | "chat" | "git";
 
   init: () => Promise<void>;
   setActiveProject: (id: string | null) => void;
-  setActiveSession: (id: string | null) => void;
+  setActiveSession: (id: string | null) => Promise<void>;
   setSelectedModel: (model: string) => void;
   addProject: (path: string) => Promise<void>;
   removeProject: (id: string) => Promise<void>;
   refreshSessions: () => Promise<void>;
   newAgent: () => Promise<void>;
   sendMessage: (prompt: string) => Promise<void>;
+  cancelStream: () => Promise<void>;
+  clearError: () => void;
   goHome: () => void;
   openGit: (projectId?: string) => void;
+  openPlanNewIdea: () => void;
+  consumePlanTemplate: () => void;
   getProjectGroups: () => ProjectGroup[];
 }
 
@@ -41,7 +49,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedModel: "composer-2.5",
   isLoading: false,
   isStreaming: false,
+  activeRunId: null,
   error: null,
+  errorMeta: null,
+  planTemplate: null,
   view: "home",
 
   init: async () => {
@@ -69,14 +80,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (id) api.touchProject(id).catch(() => {});
   },
 
-  setActiveSession: (id) => {
+  setActiveSession: async (id) => {
+    if (!id) {
+      set({ activeSessionId: null, view: "home", messages: [] });
+      return;
+    }
     const session = get().sessions.find((s) => s.id === id);
-    set({
-      activeSessionId: id,
-      activeProjectId: session?.projectId ?? get().activeProjectId,
-      view: id ? "chat" : "home",
-      messages: [],
-    });
+    set({ isLoading: true, error: null });
+    try {
+      const messages = await api.fetchMessages(id);
+      set({
+        activeSessionId: id,
+        activeProjectId: session?.projectId ?? get().activeProjectId,
+        view: "chat",
+        messages,
+        isLoading: false,
+      });
+    } catch (err) {
+      set({
+        activeSessionId: id,
+        activeProjectId: session?.projectId ?? get().activeProjectId,
+        view: "chat",
+        messages: [],
+        isLoading: false,
+        error: err instanceof Error ? err.message : "加载会话失败",
+      });
+    }
   },
 
   setSelectedModel: (model) => set({ selectedModel: model }),
@@ -95,9 +124,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeSessionId: s.sessions.find((sess) => sess.id === s.activeSessionId)?.projectId === id
         ? null
         : s.activeSessionId,
-      view: s.activeSessionId && s.sessions.find((sess) => sess.id === s.activeSessionId)?.projectId === id
-        ? "home"
-        : s.view,
+      view:
+        s.activeSessionId &&
+        s.sessions.find((sess) => sess.id === s.activeSessionId)?.projectId === id
+          ? "home"
+          : s.view,
     }));
   },
 
@@ -133,9 +164,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { activeSessionId, activeProjectId, projects, selectedModel } = get();
     let sessionId = activeSessionId;
 
-    set({ error: null });
+    set({ error: null, errorMeta: null });
 
-    // Create session on first message if needed
     if (!sessionId) {
       const projectId = activeProjectId ?? projects[0]?.id;
       if (!projectId) {
@@ -155,7 +185,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         }));
         await get().refreshSessions();
       } catch (err) {
-        set({ isLoading: false, error: err instanceof Error ? err.message : "创建失败" });
+        const e = err as Error & { errorType?: string };
+        set({
+          isLoading: false,
+          error: e.message ?? "创建失败",
+          errorMeta: { errorType: e.errorType ?? "startup", retryable: true },
+        });
         return;
       }
     } else {
@@ -167,56 +202,140 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       messages: [...s.messages, userMsg, assistantMsg],
       isStreaming: true,
+      activeRunId: null,
     }));
 
     try {
-      await api.sendPromptStream(sessionId!, prompt, (event, data) => {
-        if (event === "message") {
-          const d = data as { text?: string };
-          if (d.text) {
+      await api.sendPromptStream(sessionId!, prompt, {
+        onStarted: (runId) => {
+          set({ activeRunId: runId });
+          set((s) => {
+            const msgs = [...s.messages];
+            const last = msgs[msgs.length - 1];
+            if (last?.role === "assistant") msgs[msgs.length - 1] = { ...last, runId };
+            return { messages: msgs };
+          });
+        },
+        onEvent: (event, data) => {
+          if (event === "message") {
+            const d = data as { text?: string };
+            if (d.text) {
+              set((s) => {
+                const msgs = [...s.messages];
+                const last = msgs[msgs.length - 1];
+                if (last?.role === "assistant") {
+                  msgs[msgs.length - 1] = { ...last, content: last.content + d.text };
+                }
+                return { messages: msgs };
+              });
+            }
+          }
+          if (event === "done") {
+            const d = data as { status?: string; runId?: string; errorType?: string };
             set((s) => {
               const msgs = [...s.messages];
               const last = msgs[msgs.length - 1];
               if (last?.role === "assistant") {
-                msgs[msgs.length - 1] = { ...last, content: last.content + d.text };
+                msgs[msgs.length - 1] = {
+                  ...last,
+                  isStreaming: false,
+                  errorType: d.status === "error" ? "run" : undefined,
+                };
+              }
+              return {
+                messages: msgs,
+                isStreaming: false,
+                activeRunId: null,
+                error: d.status === "error" ? "Agent 运行失败" : null,
+                errorMeta:
+                  d.status === "error"
+                    ? { runId: d.runId, errorType: "run" }
+                    : null,
+              };
+            });
+            get().refreshSessions();
+          }
+          if (event === "error") {
+            const d = data as {
+              message?: string;
+              retryable?: boolean;
+              runId?: string;
+              agentId?: string;
+              errorType?: string;
+            };
+            set((s) => {
+              const msgs = [...s.messages];
+              const last = msgs[msgs.length - 1];
+              if (last?.role === "assistant") {
+                msgs[msgs.length - 1] = {
+                  ...last,
+                  content: last.content || `错误: ${d.message}`,
+                  isStreaming: false,
+                  errorType: (d.errorType as "startup" | "run") ?? "run",
+                };
               }
               return { messages: msgs };
             });
+            set({
+              error: d.message ?? "运行失败",
+              errorMeta: {
+                runId: d.runId,
+                agentId: d.agentId,
+                retryable: d.retryable,
+                errorType: d.errorType,
+              },
+            });
           }
-        }
-        if (event === "done") {
-          set((s) => {
-            const msgs = [...s.messages];
-            const last = msgs[msgs.length - 1];
-            if (last?.role === "assistant") {
-              msgs[msgs.length - 1] = { ...last, isStreaming: false };
-            }
-            return { messages: msgs, isStreaming: false };
-          });
-          get().refreshSessions();
-        }
+        },
       });
     } catch (err) {
+      const e = err as Error & { errorType?: string };
       set((s) => {
         const msgs = [...s.messages];
         const last = msgs[msgs.length - 1];
-        if (last?.role === "assistant" && !last.content) {
+        if (last?.role === "assistant") {
           msgs[msgs.length - 1] = {
             ...last,
-            content: `错误: ${err instanceof Error ? err.message : "运行失败"}`,
+            content: last.content || `错误: ${e.message}`,
             isStreaming: false,
+            errorType: (e.errorType as "startup" | "run") ?? "startup",
           };
         }
-        return {
-          messages: msgs,
-          isStreaming: false,
-          error: err instanceof Error ? err.message : "运行失败",
-        };
+        return { messages: msgs, isStreaming: false, activeRunId: null };
+      });
+      set({
+        error: e.message ?? "运行失败",
+        errorMeta: { errorType: e.errorType ?? "startup", retryable: true },
       });
     }
   },
 
-  goHome: () => set({ view: "home", activeSessionId: null, messages: [] }),
+  cancelStream: async () => {
+    const { activeSessionId, activeRunId } = get();
+    if (!activeSessionId || !activeRunId) return;
+    try {
+      await api.cancelRun(activeSessionId, activeRunId);
+      set((s) => {
+        const msgs = [...s.messages];
+        const last = msgs[msgs.length - 1];
+        if (last?.role === "assistant" && last.isStreaming) {
+          msgs[msgs.length - 1] = {
+            ...last,
+            content: last.content || "(已取消)",
+            isStreaming: false,
+          };
+        }
+        return { messages: msgs, isStreaming: false, activeRunId: null };
+      });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "取消失败" });
+    }
+  },
+
+  clearError: () => set({ error: null, errorMeta: null }),
+
+  goHome: () =>
+    set({ view: "home", activeSessionId: null, messages: [], error: null, errorMeta: null }),
 
   openGit: (projectId) => {
     const id = projectId ?? get().activeProjectId ?? get().projects[0]?.id;
@@ -226,6 +345,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     set({ activeProjectId: id, view: "git", activeSessionId: null, messages: [] });
   },
+
+  openPlanNewIdea: () => set({ planTemplate: PLAN_NEW_IDEA_TEMPLATE, view: "home" }),
+
+  consumePlanTemplate: () => set({ planTemplate: null }),
 
   getProjectGroups: () => {
     const { projects, sessions } = get();
