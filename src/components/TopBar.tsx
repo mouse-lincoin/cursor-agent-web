@@ -1,10 +1,12 @@
 "use client";
 
-import { ChevronDown, ExternalLink, GitBranch, LayoutGrid, MoreHorizontal, User } from "lucide-react";
+import { ChevronDown, Cloud, ExternalLink, GitBranch, LayoutGrid, MoreHorizontal, User } from "lucide-react";
+import type { AgentRuntime } from "@/types";
 
 interface TopBarProps {
   projectName?: string;
   projectPath?: string;
+  runtime?: AgentRuntime;
   onHomeClick?: () => void;
   onGitClick?: () => void;
   showGit?: boolean;
@@ -13,6 +15,7 @@ interface TopBarProps {
 export function TopBar({
   projectName = "Home",
   projectPath,
+  runtime = "local",
   onHomeClick,
   onGitClick,
   showGit,
@@ -32,8 +35,12 @@ export function TopBar({
           <ChevronDown size={14} className="text-text-muted" />
         </button>
         <div className="flex items-center gap-1.5 rounded-full border border-border bg-bg-surface px-2.5 py-0.5 text-[11px] text-text-secondary">
-          <User size={11} className="text-success" />
-          <span>Local</span>
+          {runtime === "cloud" ? (
+            <Cloud size={11} className="text-accent" />
+          ) : (
+            <User size={11} className="text-success" />
+          )}
+          <span>{runtime === "cloud" ? "Cloud" : "Local"}</span>
         </div>
       </div>
 

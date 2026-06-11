@@ -119,7 +119,8 @@ cursor-agent-web/
 | M1 骨架 | Next.js 脚手架、深色 UI 壳 | 完成 |
 | M2 Agent | SDK 集成、流式对话、项目管理 API | 完成 |
 | M3 Git | Git 面板 + 完整命令封装 | 完成 |
-| M4 打磨 | @/ 菜单、错误处理、会话恢复 | **完成** |
+| M4 打磨 | @/ 菜单、错误处理、会话恢复 | 完成 |
+| P2 扩展 | Cloud、Automations、Customize、语音、分屏 | **完成** |
 
 详细功能分级与 API 设计见 [docs/PRD.md](docs/PRD.md)。
 

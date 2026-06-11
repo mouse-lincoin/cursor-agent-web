@@ -35,7 +35,9 @@ export function PromptInput({
   const [menuQuery, setMenuQuery] = useState("");
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [files, setFiles] = useState<FileEntry[]>([]);
+  const [listening, setListening] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const selectedModel = controlledModel ?? internalModel;
   const currentModel = models.find((m) => m.id === selectedModel);
@@ -105,6 +107,36 @@ export function PromptInput({
     setInternalModel(id);
     onModelChange?.(id);
     setModelOpen(false);
+  }
+
+  function toggleVoice() {
+    const SpeechRecognition =
+      typeof window !== "undefined"
+        ? window.SpeechRecognition || window.webkitSpeechRecognition
+        : undefined;
+    if (!SpeechRecognition) return;
+
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "zh-CN";
+    recognition.interimResults = true;
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setValue((v) => v + transcript);
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -225,7 +257,14 @@ export function PromptInput({
               </button>
             )}
           </div>
-          <button type="button" className="rounded-full p-2 text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-secondary">
+          <button
+            type="button"
+            onClick={toggleVoice}
+            title="语音输入"
+            className={`rounded-full p-2 transition-colors hover:bg-bg-elevated ${
+              listening ? "text-accent" : "text-text-muted hover:text-text-secondary"
+            }`}
+          >
             <Mic size={18} />
           </button>
         </div>

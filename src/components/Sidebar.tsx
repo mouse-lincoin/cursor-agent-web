@@ -27,6 +27,9 @@ interface SidebarProps {
   onSelectProject?: (projectId: string) => void;
   onAddProject?: () => void;
   onOpenGit?: (projectId: string) => void;
+  onOpenAutomations?: () => void;
+  onOpenCustomize?: () => void;
+  onOpenSettings?: () => void;
 }
 
 function SessionItem({
@@ -122,6 +125,9 @@ export function Sidebar({
   onSelectProject,
   onAddProject,
   onOpenGit,
+  onOpenAutomations,
+  onOpenCustomize,
+  onOpenSettings,
 }: SidebarProps) {
   return (
     <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-border-subtle bg-bg-sidebar">
@@ -150,11 +156,17 @@ export function Sidebar({
       </div>
 
       <nav className="space-y-0.5 px-3 pb-3">
-        <button className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-text-secondary transition-colors hover:bg-bg-elevated/60 hover:text-text-primary">
+        <button
+          onClick={onOpenAutomations}
+          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-text-secondary transition-colors hover:bg-bg-elevated/60 hover:text-text-primary"
+        >
           <Bot size={15} className="opacity-70" />
           Automations
         </button>
-        <button className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-text-secondary transition-colors hover:bg-bg-elevated/60 hover:text-text-primary">
+        <button
+          onClick={onOpenCustomize}
+          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-text-secondary transition-colors hover:bg-bg-elevated/60 hover:text-text-primary"
+        >
           <SlidersHorizontal size={15} className="opacity-70" />
           Customize
         </button>
@@ -225,7 +237,10 @@ export function Sidebar({
           <button className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-secondary">
             <Filter size={14} />
           </button>
-          <button className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-secondary">
+          <button
+            onClick={onOpenSettings}
+            className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-secondary"
+          >
             <Settings size={14} />
           </button>
         </div>

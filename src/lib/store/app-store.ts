@@ -2,38 +2,56 @@
 
 import { create } from "zustand";
 import * as api from "@/lib/api/client";
-import type { AgentSession, ChatMessage, ModelInfo, Project, ProjectGroup } from "@/types";
-import { PLAN_NEW_IDEA_TEMPLATE } from "@/types";
+import * as settingsApi from "@/lib/api/settings-client";
+import type {
+  AgentRuntime,
+  AgentSession,
+  AppSettings,
+  AppView,
+  ChatMessage,
+  ModelInfo,
+  Project,
+  ProjectGroup,
+} from "@/types";
+import { DEFAULT_SETTINGS, PLAN_NEW_IDEA_TEMPLATE } from "@/types";
 
 interface AppState {
   projects: Project[];
   sessions: AgentSession[];
   models: ModelInfo[];
+  settings: AppSettings;
   messages: ChatMessage[];
   activeProjectId: string | null;
   activeSessionId: string | null;
   selectedModel: string;
+  selectedRuntime: AgentRuntime;
+  repoUrl: string | null;
   isLoading: boolean;
   isStreaming: boolean;
   activeRunId: string | null;
   error: string | null;
   errorMeta: { runId?: string; agentId?: string; retryable?: boolean; errorType?: string } | null;
   planTemplate: string | null;
-  view: "home" | "chat" | "git";
+  view: AppView;
 
   init: () => Promise<void>;
   setActiveProject: (id: string | null) => void;
   setActiveSession: (id: string | null) => Promise<void>;
   setSelectedModel: (model: string) => void;
+  setSelectedRuntime: (runtime: AgentRuntime) => void;
   addProject: (path: string) => Promise<void>;
   removeProject: (id: string) => Promise<void>;
   refreshSessions: () => Promise<void>;
+  refreshRepoUrl: () => Promise<void>;
   newAgent: () => Promise<void>;
   sendMessage: (prompt: string) => Promise<void>;
   cancelStream: () => Promise<void>;
   clearError: () => void;
   goHome: () => void;
   openGit: (projectId?: string) => void;
+  openAutomations: () => void;
+  openCustomize: () => void;
+  openSettings: () => void;
   openPlanNewIdea: () => void;
   consumePlanTemplate: () => void;
   getProjectGroups: () => ProjectGroup[];
@@ -43,10 +61,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   projects: [],
   sessions: [],
   models: [{ id: "composer-2.5", label: "Composer 2.5" }],
+  settings: DEFAULT_SETTINGS,
   messages: [],
   activeProjectId: null,
   activeSessionId: null,
   selectedModel: "composer-2.5",
+  selectedRuntime: "local",
+  repoUrl: null,
   isLoading: false,
   isStreaming: false,
   activeRunId: null,
@@ -58,16 +79,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   init: async () => {
     set({ isLoading: true, error: null });
     try {
-      const [projects, sessions, models] = await Promise.all([
+      const [projects, sessions, models, settings] = await Promise.all([
         api.fetchProjects(),
         api.fetchSessions(),
         api.fetchModels(),
+        settingsApi.fetchSettings(),
       ]);
       set({
         projects,
         sessions,
         models: models.length ? models : get().models,
+        settings,
         selectedModel: models[0]?.id ?? "composer-2.5",
+        selectedRuntime: settings.defaultRuntime,
         isLoading: false,
       });
     } catch (err) {
@@ -77,7 +101,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveProject: (id) => {
     set({ activeProjectId: id });
-    if (id) api.touchProject(id).catch(() => {});
+    if (id) {
+      api.touchProject(id).catch(() => {});
+      get().refreshRepoUrl();
+    }
   },
 
   setActiveSession: async (id) => {
@@ -92,6 +119,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         activeSessionId: id,
         activeProjectId: session?.projectId ?? get().activeProjectId,
+        selectedRuntime: session?.runtime ?? "local",
         view: "chat",
         messages,
         isLoading: false,
@@ -99,7 +127,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (err) {
       set({
         activeSessionId: id,
-        activeProjectId: session?.projectId ?? get().activeProjectId,
         view: "chat",
         messages: [],
         isLoading: false,
@@ -110,9 +137,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSelectedModel: (model) => set({ selectedModel: model }),
 
+  setSelectedRuntime: (runtime) => {
+    set({ selectedRuntime: runtime });
+    if (runtime === "cloud") get().refreshRepoUrl();
+  },
+
+  refreshRepoUrl: async () => {
+    const projectId = get().activeProjectId ?? get().projects[0]?.id;
+    if (!projectId) return set({ repoUrl: null });
+    const url = await settingsApi.fetchRepoUrl(projectId);
+    set({ repoUrl: url });
+  },
+
   addProject: async (path) => {
     const project = await api.addProject(path);
     set((s) => ({ projects: [project, ...s.projects], activeProjectId: project.id }));
+    get().refreshRepoUrl();
   },
 
   removeProject: async (id) => {
@@ -121,9 +161,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       projects: s.projects.filter((p) => p.id !== id),
       sessions: s.sessions.filter((sess) => sess.projectId !== id),
       activeProjectId: s.activeProjectId === id ? null : s.activeProjectId,
-      activeSessionId: s.sessions.find((sess) => sess.id === s.activeSessionId)?.projectId === id
-        ? null
-        : s.activeSessionId,
+      activeSessionId:
+        s.sessions.find((sess) => sess.id === s.activeSessionId)?.projectId === id
+          ? null
+          : s.activeSessionId,
       view:
         s.activeSessionId &&
         s.sessions.find((sess) => sess.id === s.activeSessionId)?.projectId === id
@@ -138,7 +179,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   newAgent: async () => {
-    const { activeProjectId, selectedModel, projects } = get();
+    const { activeProjectId, selectedModel, selectedRuntime, projects } = get();
     const projectId = activeProjectId ?? projects[0]?.id;
     if (!projectId) {
       set({ error: "请先添加一个项目目录" });
@@ -146,7 +187,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     set({ isLoading: true, error: null });
     try {
-      const session = await api.createSession(projectId, selectedModel);
+      const session = await api.createSession(projectId, selectedModel, "New Agent", selectedRuntime);
       set((s) => ({
         sessions: [session, ...s.sessions],
         activeSessionId: session.id,
@@ -161,7 +202,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   sendMessage: async (prompt) => {
-    const { activeSessionId, activeProjectId, projects, selectedModel } = get();
+    const { activeSessionId, activeProjectId, projects, selectedModel, selectedRuntime } = get();
     let sessionId = activeSessionId;
 
     set({ error: null, errorMeta: null });
@@ -174,7 +215,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       set({ isLoading: true });
       try {
-        const session = await api.createSession(projectId, selectedModel, prompt.slice(0, 60));
+        const session = await api.createSession(
+          projectId,
+          selectedModel,
+          prompt.slice(0, 60),
+          selectedRuntime
+        );
         sessionId = session.id;
         set((s) => ({
           sessions: [session, ...s.sessions],
@@ -231,7 +277,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             }
           }
           if (event === "done") {
-            const d = data as { status?: string; runId?: string; errorType?: string };
+            const d = data as { status?: string; runId?: string };
             set((s) => {
               const msgs = [...s.messages];
               const last = msgs[msgs.length - 1];
@@ -247,10 +293,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                 isStreaming: false,
                 activeRunId: null,
                 error: d.status === "error" ? "Agent 运行失败" : null,
-                errorMeta:
-                  d.status === "error"
-                    ? { runId: d.runId, errorType: "run" }
-                    : null,
+                errorMeta: d.status === "error" ? { runId: d.runId, errorType: "run" } : null,
               };
             });
             get().refreshSessions();
@@ -346,8 +389,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ activeProjectId: id, view: "git", activeSessionId: null, messages: [] });
   },
 
-  openPlanNewIdea: () => set({ planTemplate: PLAN_NEW_IDEA_TEMPLATE, view: "home" }),
+  openAutomations: () => set({ view: "automations", activeSessionId: null, messages: [] }),
+  openCustomize: () => set({ view: "customize", activeSessionId: null, messages: [] }),
+  openSettings: () => set({ view: "settings", activeSessionId: null, messages: [] }),
 
+  openPlanNewIdea: () => set({ planTemplate: PLAN_NEW_IDEA_TEMPLATE, view: "home" }),
   consumePlanTemplate: () => set({ planTemplate: null }),
 
   getProjectGroups: () => {
@@ -365,7 +411,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           path: p.path,
           sessions: sessions
             .filter((s) => s.projectId === p.id)
-            .map((s) => ({ id: s.id, title: s.title })),
+            .map((s) => ({ id: s.id, title: s.title, runtime: s.runtime })),
         })),
       },
     ];

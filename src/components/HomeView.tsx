@@ -2,15 +2,20 @@
 
 import { Lightbulb } from "lucide-react";
 import { PromptInput } from "./PromptInput";
+import { RuntimeToggle } from "./RuntimeToggle";
+import type { AgentRuntime } from "@/types";
 
 interface HomeViewProps {
   models: { id: string; label: string }[];
   selectedModel: string;
+  selectedRuntime: AgentRuntime;
+  repoUrl?: string | null;
   isStreaming: boolean;
   hasProjects: boolean;
   projectId?: string | null;
   planTemplate?: string | null;
   onModelChange: (model: string) => void;
+  onRuntimeChange: (runtime: AgentRuntime) => void;
   onSubmit?: (prompt: string) => void;
   onPlanNewIdea?: () => void;
   onAddProject?: () => void;
@@ -20,11 +25,14 @@ interface HomeViewProps {
 export function HomeView({
   models,
   selectedModel,
+  selectedRuntime,
+  repoUrl,
   isStreaming,
   hasProjects,
   projectId,
   planTemplate,
   onModelChange,
+  onRuntimeChange,
   onSubmit,
   onPlanNewIdea,
   onAddProject,
@@ -41,6 +49,14 @@ export function HomeView({
             </button>{" "}
             后即可开始 Agent 对话。
           </div>
+        )}
+
+        {hasProjects && (
+          <RuntimeToggle
+            value={selectedRuntime}
+            onChange={onRuntimeChange}
+            repoUrl={repoUrl}
+          />
         )}
 
         <PromptInput

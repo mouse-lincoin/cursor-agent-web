@@ -6,12 +6,16 @@ export interface Project {
   lastOpenedAt: string;
 }
 
+export type AgentRuntime = "local" | "cloud";
+
 export interface AgentSession {
   id: string;
   projectId: string;
   agentId: string;
   title: string;
   model: string;
+  runtime: AgentRuntime;
+  repoUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,11 +35,41 @@ export interface SessionTranscript {
   updatedAt: string;
 }
 
+export interface Automation {
+  id: string;
+  name: string;
+  projectId: string;
+  prompt: string;
+  cron: string;
+  model: string;
+  runtime: AgentRuntime;
+  enabled: boolean;
+  lastRunAt?: string;
+  lastStatus?: "finished" | "error";
+  createdAt: string;
+}
+
+export interface AppSettings {
+  defaultRuntime: AgentRuntime;
+  sandboxMode: boolean;
+  splitView: boolean;
+}
+
+export interface RuleInfo {
+  id: string;
+  name: string;
+  path: string;
+  source: "user" | "project";
+  preview: string;
+}
+
 export interface DataStore {
   projects: Project[];
   sessions: AgentSession[];
   runs: RunRecord[];
   transcripts: SessionTranscript[];
+  automations: Automation[];
+  settings: AppSettings;
 }
 
 export interface ChatMessage {
@@ -78,9 +112,17 @@ export interface ProjectGroup {
     id: string;
     name: string;
     path: string;
-    sessions: { id: string; title: string }[];
+    sessions: { id: string; title: string; runtime?: AgentRuntime }[];
   }[];
 }
+
+export type AppView = "home" | "chat" | "git" | "automations" | "customize" | "settings";
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  defaultRuntime: "local",
+  sandboxMode: false,
+  splitView: false,
+};
 
 export const PLAN_NEW_IDEA_TEMPLATE = `I have a new idea I'd like to plan. Please help me:
 1. Ask clarifying questions about the goal and constraints

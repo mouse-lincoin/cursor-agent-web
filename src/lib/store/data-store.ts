@@ -1,13 +1,23 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import type { AgentSession, ChatMessage, DataStore, Project, RunRecord, SessionTranscript } from "@/types";
+import type {
+  AgentSession,
+  AppSettings,
+  Automation,
+  ChatMessage,
+  DataStore,
+  Project,
+  RunRecord,
+  SessionTranscript,
+} from "@/types";
+import { DEFAULT_SETTINGS } from "@/types";
 
 const DATA_DIR = process.env.DATA_DIR ?? path.join(os.homedir(), ".cursor-agent-web");
 const DATA_FILE = path.join(DATA_DIR, "data.json");
 
 function emptyStore(): DataStore {
-  return { projects: [], sessions: [], runs: [], transcripts: [] };
+  return { projects: [], sessions: [], runs: [], transcripts: [], automations: [], settings: { ...DEFAULT_SETTINGS } };
 }
 
 function readStore(): DataStore {
@@ -15,11 +25,17 @@ function readStore(): DataStore {
     if (!fs.existsSync(DATA_FILE)) return emptyStore();
     const raw = fs.readFileSync(DATA_FILE, "utf-8");
     const parsed = JSON.parse(raw) as Partial<DataStore>;
+    const sessions = (parsed.sessions ?? []).map((s) => ({
+      ...s,
+      runtime: s.runtime ?? "local",
+    }));
     return {
       projects: parsed.projects ?? [],
-      sessions: parsed.sessions ?? [],
+      sessions,
       runs: parsed.runs ?? [],
       transcripts: parsed.transcripts ?? [],
+      automations: parsed.automations ?? [],
+      settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
     };
   } catch {
     return emptyStore();
@@ -68,8 +84,54 @@ export function removeProject(id: string): boolean {
   store.sessions = store.sessions.filter((s) => s.projectId !== id);
   store.transcripts = store.transcripts.filter((t) => !removedSessionIds.includes(t.sessionId));
   store.runs = store.runs.filter((r) => !removedSessionIds.includes(r.agentSessionId));
+  store.automations = store.automations.filter((a) => a.projectId !== id);
   writeStore(store);
   return store.projects.length < before;
+}
+
+export function getSettings(): AppSettings {
+  return readStore().settings;
+}
+
+export function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  const store = readStore();
+  store.settings = { ...store.settings, ...patch };
+  writeStore(store);
+  return store.settings;
+}
+
+export function listAutomations(): Automation[] {
+  return readStore().automations.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export function getAutomation(id: string): Automation | undefined {
+  return readStore().automations.find((a) => a.id === id);
+}
+
+export function addAutomation(automation: Automation): Automation {
+  const store = readStore();
+  store.automations.push(automation);
+  writeStore(store);
+  return automation;
+}
+
+export function updateAutomation(id: string, patch: Partial<Automation>): Automation | undefined {
+  const store = readStore();
+  const idx = store.automations.findIndex((a) => a.id === id);
+  if (idx === -1) return undefined;
+  store.automations[idx] = { ...store.automations[idx], ...patch };
+  writeStore(store);
+  return store.automations[idx];
+}
+
+export function removeAutomation(id: string): boolean {
+  const store = readStore();
+  const before = store.automations.length;
+  store.automations = store.automations.filter((a) => a.id !== id);
+  writeStore(store);
+  return store.automations.length < before;
 }
 
 export function listSessions(projectId?: string): AgentSession[] {

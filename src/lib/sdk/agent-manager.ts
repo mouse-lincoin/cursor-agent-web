@@ -1,14 +1,43 @@
 import { Agent, type SDKAgent } from "@cursor/sdk";
 import { getApiKey } from "./config";
+import type { AgentRuntime } from "@/types";
 
-// In-memory cache: sessionId -> live SDK agent instance
 const agentCache = new Map<string, SDKAgent>();
 
-export async function createAgent(cwd: string, model: string): Promise<SDKAgent> {
+export interface CreateAgentOptions {
+  cwd: string;
+  model: string;
+  runtime?: AgentRuntime;
+  repoUrl?: string;
+  sandbox?: boolean;
+  name?: string;
+}
+
+export async function createAgent(opts: CreateAgentOptions): Promise<SDKAgent> {
+  const { cwd, model, runtime = "local", repoUrl, sandbox, name } = opts;
+
+  if (runtime === "cloud") {
+    if (!repoUrl) throw new Error("Cloud Agent 需要 Git 仓库 URL（origin remote）");
+    const agent = await Agent.create({
+      apiKey: getApiKey(),
+      model: { id: model },
+      name,
+      cloud: {
+        repos: [{ url: repoUrl }],
+        skipReviewerRequest: true,
+      },
+    });
+    return agent;
+  }
+
   const agent = await Agent.create({
     apiKey: getApiKey(),
     model: { id: model },
-    local: { cwd },
+    name,
+    local: {
+      cwd,
+      ...(sandbox ? { sandboxOptions: { enabled: true } } : {}),
+    },
   });
   return agent;
 }

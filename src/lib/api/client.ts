@@ -1,5 +1,5 @@
 import { parseSSEChunk } from "@/lib/sdk/sse";
-import type { AgentSession, ChatMessage, FileEntry, ModelInfo, Project, SkillInfo } from "@/types";
+import type { AgentRuntime, AgentSession, ChatMessage, FileEntry, ModelInfo, Project, SkillInfo } from "@/types";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   const data = await res.json();
@@ -41,12 +41,17 @@ export async function fetchSessions(projectId?: string): Promise<AgentSession[]>
   return data.sessions;
 }
 
-export async function createSession(projectId: string, model: string, title?: string): Promise<AgentSession> {
+export async function createSession(
+  projectId: string,
+  model: string,
+  title?: string,
+  runtime?: AgentRuntime
+): Promise<AgentSession> {
   const data = await handleResponse<{ session: AgentSession }>(
     await fetch("/api/agents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, model, title }),
+      body: JSON.stringify({ projectId, model, title, runtime }),
     })
   );
   return data.session;
